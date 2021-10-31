@@ -5,6 +5,7 @@ A user study of VR interaction.
 ### Use of Oculus Avatars
 Oculus user information associated with the specific virtual reality headset used to perform the study will remain confidential.  No Oculus account information will be kept after the conclusion of the participant's VR session with the researcher.  The following Oculus account information will be used during the VR session associated with the VR headset used, which may or may not correspond to the actual participant's Oculus account: User Profile, User ID, and Avatars.  Participants will be given the option to remain anonymous during the user study in lieu of using their personal Oculus account.
 
+## User Study
 ### SUMMARY OF KEY INFORMATION:
 - Purpose: The purpose of this study is to learn how users interact with a new virtual reality user interface.
 - Procedures: The participant will complete a short survey and then experience virtual reality using an Oculus Quest 2 headset while being interviewed by the researcher. The study will take approximately 20-30 minutes.
