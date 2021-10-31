@@ -2,7 +2,7 @@
 A user study of VR interaction.
 
 ## Privacy Policy
-### Use of Oculus Avatars
+### Use of Oculus Avatars and Account Information
 Oculus user information associated with the specific virtual reality headset used to perform the study will remain confidential.  No Oculus account information will be kept after the conclusion of the participant's VR session with the researcher.  The following Oculus account information will be used during the VR session associated with the VR headset used, which may or may not correspond to the actual participant's Oculus account: User Profile, User ID, and Avatars.  Participants will be given the option to remain anonymous during the user study in lieu of using their personal Oculus account.
 
 ## User Study
