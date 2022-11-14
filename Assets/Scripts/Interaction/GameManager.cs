@@ -1,5 +1,6 @@
+using CardsVR.Networking;
 using CardsVR.States;
-using Photon.Pun;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -8,14 +9,20 @@ namespace CardsVR.Interaction
 {
     public class GameManager : Singleton<GameManager>
     {
-        public Stack<int> CardsDeck;
+        public Stack<int> CardsDeck1;
+        public Stack<int> CardsDeck2;
         public Stack<int> CardsHandDominant;
+        public Stack<int> CardsHandInferior;
         public Stack<int> CardsPile1;
         public Stack<int> CardsPile2;
         public Stack<int> CardsPile3;
         public Stack<int> CardsPile4;
         public Stack<int> CardsPile5;
         public Stack<int> CardsPile6;
+        public Stack<int> CardsFreeStack;
+
+        public List<int> Cards = new List<int>();
+        public Dictionary<int, int> CardOwner = new Dictionary<int, int>();
 
         public GameObject Pile0;
         public GameObject Pile1;
@@ -24,74 +31,74 @@ namespace CardsVR.Interaction
         public GameObject Pile4;
         public GameObject Pile5;
         public GameObject Pile6;
+        public GameObject Pile7;
+        public GameObject FreeCardsAnchor;
 
         public PhysicMaterial cardMaterial;
         public float cardThickness = 0.0005f;
         public float pileOffset = -0.025f;
 
         public enum DominantHandState { Free, Held };
-        public DominantHandState StateDominantHand;
+        private DominantHandState _dominantHandState;
+        public DominantHandState StateDominantHand
+        {
+            get
+            {
+                updateHandState();
+                return _dominantHandState;
+            }
+            set { _dominantHandState = value; }
+        }
 
         public GameObject debugText;
         public GameObject debugTextPriority;
 
-        private HandsManager HM;
+        public Stack<int> CardsDeck
+        {
+            get
+            {
+                int PlayerID = PlayerManager.Instance.PlayerNum;
+                if (PlayerID == 1)
+                    return CardsDeck1;
+                else if (PlayerID == 2)
+                    return CardsDeck2;
+                else
+                {
+                    Debug.LogError("Tried to access a deck without being assigned a player number first.");
+                    return null;
+                }
+                    
+            }
+            set
+            {
+                int PlayerID = PlayerManager.Instance.PlayerNum;
+                if (PlayerID == 1)
+                    CardsDeck1 = value;
+                else if (PlayerID == 2)
+                    CardsDeck2 = value;
+                else
+                    Debug.LogError("Tried to assign a deck without being assigned a player number first.");
+            }
+        }
 
         private void Start()
         {
-            HM = HandsManager.Instance;
-            Deck Deck = new Deck();
+            // Initialize Decks
+            CardsDeck1 = new Stack<int>();
+            CardsDeck2 = new Stack<int>();
 
             // Initialize Stacks
-            CardsDeck = Deck.cardIDs;
             CardsHandDominant = new Stack<int>();
+            CardsHandInferior = new Stack<int>();
             CardsPile1 = new Stack<int>();
             CardsPile2 = new Stack<int>();
             CardsPile3 = new Stack<int>();
             CardsPile4 = new Stack<int>();
             CardsPile5 = new Stack<int>();
             CardsPile6 = new Stack<int>();
+            CardsFreeStack = new Stack<int>();
 
-            if (PhotonNetwork.IsMasterClient)
-            {
-                // Test
-                CardsPile1.Push(CardsDeck.Pop());
-                CardsPile1.Push(CardsDeck.Pop());
-                CardsPile1.Push(CardsDeck.Pop());
-
-                // Test
-                CardsPile2.Push(CardsDeck.Pop());
-                CardsPile2.Push(CardsDeck.Pop());
-                CardsPile2.Push(CardsDeck.Pop());
-
-                // Test
-                CardsPile3.Push(CardsDeck.Pop());
-                CardsPile3.Push(CardsDeck.Pop());
-                CardsPile3.Push(CardsDeck.Pop());
-
-                // Test
-                CardsPile4.Push(CardsDeck.Pop());
-                CardsPile4.Push(CardsDeck.Pop());
-                CardsPile4.Push(CardsDeck.Pop());
-
-                // Test
-                CardsPile5.Push(CardsDeck.Pop());
-                CardsPile5.Push(CardsDeck.Pop());
-                CardsPile5.Push(CardsDeck.Pop());
-
-                // Test
-                CardsPile6.Push(CardsDeck.Pop());
-                CardsPile6.Push(CardsDeck.Pop());
-                CardsPile6.Push(CardsDeck.Pop());
-            }
-
-            SpawnPile(CardsDeck, 0);
-            SpawnPile(CardsPile1, 1);
-            SpawnPile(CardsPile2, 2);
-            SpawnPile(CardsPile3, 3);
-            SpawnPile(CardsPile4, 4);
-            SpawnPile(CardsPile5, 5);
-            SpawnPile(CardsPile6, 6);
+            StartCoroutine("DealCards");
         }
 
         public void Update()
@@ -99,10 +106,123 @@ namespace CardsVR.Interaction
             updateHandState();
         }
 
-        public void addCardToPile(int cardID, int pileID)
+        /*
+         *      A coroutine used to deal the cards to their respective piles.
+         *      This function is used for testing purposes.
+         *      
+         *      Parameters
+         *      ----------
+         *      None
+         *      
+         *      Returns
+         *      -------
+         *      None
+         */
+        private IEnumerator DealCards()
         {
-            Stack<int> pile = getPileCardStack(pileID);
-            pile.Push(cardID);
+            while (PlayerManager.Instance.PlayerNum == 0)  // wait for the player ID number to be assigned.
+                yield return new WaitForSecondsRealtime(0.5f);
+
+            Deck Deck = new Deck();
+            Stack<int> CardIDs = Deck.cardIDs;
+            int N_Cards = CardIDs.Count;
+
+            if (PlayerManager.Instance.PlayerNum == 1)
+            {
+                // Deal Decks
+                for (int i = 0; i < N_Cards / 2; i++)
+                    CardsDeck1.Push(CardIDs.Pop());
+                for (int i = 0; i < N_Cards / 2; i++)
+                    CardsDeck2.Push(CardIDs.Pop());
+            }
+            else
+            {
+                // Deal Decks
+                for (int i = 0; i < N_Cards; i++)
+                    CardsFreeStack.Push(CardIDs.Pop());
+            }
+
+            // Initialize Ownership
+            for (int i = 0; i < N_Cards; i++)
+            {
+                CardOwner[i] = 1;
+                Cards.Add(i);
+            }
+
+            //if (CardsDeck.Count > 0 && PlayerManager.Instance.PlayerNum == 1)
+            //{
+            //    // Deal to Pile 1
+            //    CardsPile1.Push(CardsDeck.Pop());
+            //    CardsPile1.Push(CardsDeck.Pop());
+            //    CardsPile1.Push(CardsDeck.Pop());
+
+            //    // Deal to Pile 3
+            //    CardsPile3.Push(CardsDeck.Pop());
+            //    CardsPile3.Push(CardsDeck.Pop());
+            //    CardsPile3.Push(CardsDeck.Pop());
+
+            //    // Deal to Pile 4
+            //    CardsPile4.Push(CardsDeck.Pop());
+            //    CardsPile4.Push(CardsDeck.Pop());
+            //    CardsPile4.Push(CardsDeck.Pop());
+
+            //    // Deal to Pile 6
+            //    CardsPile6.Push(CardsDeck.Pop());
+            //    CardsPile6.Push(CardsDeck.Pop());
+            //    CardsPile6.Push(CardsDeck.Pop());
+            //}
+
+            SpawnPile(CardsDeck1, 0);
+            SpawnPile(CardsPile1, 1);
+            SpawnPile(CardsPile3, 3);
+            SpawnPile(CardsPile4, 4);
+            SpawnPile(CardsPile6, 6);
+            SpawnPile(CardsDeck2, 7);
+            SpawnPile(CardsFreeStack, -3);
+        }
+
+        public bool isCardOwned(int cardID, int playerID)
+        {
+            if (CardOwner[cardID] == playerID)
+                return true;
+            else
+                return false;
+        }
+
+        public bool isCardUnowned(int cardID)
+        {
+            if (CardOwner[cardID] == 0)
+                return true;
+            else
+                return false;
+        }
+
+        public void setCardOwned(int cardID, int playerID)
+        {
+            CardOwner[cardID] = playerID;
+        }
+
+        public List<int> CardsOwnerNotSet()
+        {
+            return CardsOwned(0);  // OwnerID : 0 -> Owner Not Set
+        }
+
+        public List<int> CardsOwnedButUnownedBy(int playerID)
+        {
+            List<int> CardsOwned = new List<int>();
+            foreach (int CardID in Cards)
+                if (!isCardOwned(CardID, playerID) && !isCardUnowned(CardID))
+                    CardsOwned.Add(CardID);
+            return CardsOwned;
+        }
+
+        public List<int> CardsOwned(int playerID)
+        {
+            List<int> CardsOwned = new List<int>();
+            foreach (int CardID in Cards)
+                if (isCardOwned(CardID, playerID))
+                    CardsOwned.Add(CardID);
+            return CardsOwned;
         }
 
         public void updateHandState()
@@ -183,36 +303,57 @@ namespace CardsVR.Interaction
             CardStateContext context = card.AddComponent<CardStateContext>();
             context.PileNum = pileID;
             context.CardID = cardID;
-            context.ChangeState(context.pileState);
-        }
-
-        public void updateCardParent(GameObject Pile, Stack<int> CardIDs)
-        {
-            if (CardIDs != null)
-            {
-                foreach (int CardID in CardIDs)
-                {
-                    // Get Deck Pile Anchor Location
-                    Transform cardAnchor = Pile.transform.Find("CardAnchor");
-
-                    // Set the Parent
-                    GameObject card = getCardByTag(CardID);
-                    if (card == null)
-                        continue;
-
-                    card.transform.parent = cardAnchor;
-                }
-            }
+            if (pileID == -3)
+                context.ChangeState(context.moveState);  // Free Card
+            else if (pileID == -1 || pileID == -2)
+                context.ChangeState(context.fingerState);  // Held Card
+            else
+                context.ChangeState(context.pileState);  // Pile Card
         }
 
         public int? getPileNumByCard(int cardID)
         {
-            for (int pileID=0; pileID<7; pileID++)
+            for (int pileID=-3; pileID<8; pileID++)
             {
-                if (getPileCardStack(pileID).Contains(cardID))
-                    return pileID;
+                try
+                {
+                    if (getPileCardStack(pileID).Contains(cardID))
+                        return pileID;
+                }
+                catch
+                {
+                    Debug.LogErrorFormat("Error caught: Pile {0} and Card {1}", pileID, cardID);
+                }
+                
             }
             return null;
+        }
+
+        public int? getPileIndexByCard(int cardID)
+        {
+            int? pile_num = getPileNumByCard(cardID);
+            if (pile_num == null)  // card not in pile
+                return null;
+
+            Stack<int> pileStack = getPileCardStack((int)pile_num);
+            int[] pileArray = pileStack.ToArray();
+            for (int i=0; i<pileArray.Length; i++)
+            {
+                if (pileArray[i] == cardID)  // card found, return index
+                    return i;
+            }
+
+            return null;  // index not found
+        }
+
+        public GameObject getPileCardCollider(int pile_num)
+        {
+            if (pile_num < 0)  // Only return piles on the table top
+                return null;
+
+            GameObject CardAnchor = getPileCardAnchor(pile_num);
+
+            return CardAnchor.transform.parent.Find("Pile" + pile_num + "Collider").gameObject;
         }
 
         public GameObject getPileCardAnchor(int pile_num)
@@ -231,8 +372,16 @@ namespace CardsVR.Interaction
                 return Pile5;
             else if (pile_num == 6)
                 return Pile6;
+            else if (pile_num == 7)
+                return Pile7;
+            else if (pile_num == -3)
+                return FreeCardsAnchor;
             else if (pile_num == -1)
                 try { return HandsManager.Instance.DominantFingerCardAnchor.gameObject; }
+                catch (UnassignedReferenceException) { return null; }
+                catch (System.Exception e) { throw e; }
+            else if (pile_num == -2)
+                try { return HandsManager.Instance.InferiorFingerCardAnchor.gameObject; }
                 catch (UnassignedReferenceException) { return null; }
                 catch (System.Exception e) { throw e; }
             else
@@ -241,10 +390,16 @@ namespace CardsVR.Interaction
                 return null;
             }
         }
+        
+        public GameObject getPile(int pile_num)
+        {
+            return getPileCardAnchor(pile_num).transform.parent.gameObject;
+        }
+
         public Stack<int> getPileCardStack(int pile_num)
         {
             if (pile_num == 0)
-                return CardsDeck;
+                return CardsDeck1;
             else if (pile_num == 1)
                 return CardsPile1;
             else if (pile_num == 2)
@@ -257,8 +412,14 @@ namespace CardsVR.Interaction
                 return CardsPile5;
             else if (pile_num == 6)
                 return CardsPile6;
+            else if (pile_num == 7)
+                return CardsDeck2;
             else if (pile_num == -1)
                 return CardsHandDominant;
+            else if (pile_num == -2)
+                return CardsHandInferior;
+            else if (pile_num == -3)
+                return CardsFreeStack;
             else
             {
                 Debug.LogErrorFormat("Unknown Pile Number: {0}", pile_num);
@@ -269,7 +430,7 @@ namespace CardsVR.Interaction
         public void setPileCardStack(int pileID, Stack<int> cardIDs)
         {
             if (pileID == 0)
-                CardsDeck = cardIDs;
+                CardsDeck1 = cardIDs;
             else if (pileID == 1)
                 CardsPile1 = cardIDs;
             else if (pileID == 2)
@@ -282,10 +443,34 @@ namespace CardsVR.Interaction
                 CardsPile5 = cardIDs;
             else if (pileID == 6)
                 CardsPile6 = cardIDs;
+            else if (pileID == 7)
+                CardsDeck2 = cardIDs;
             else if (pileID == -1)
                 CardsHandDominant = cardIDs;
+            else if (pileID == -2)
+                CardsHandInferior = cardIDs;
+            else if (pileID == -3)
+                CardsFreeStack = cardIDs;
             else
                 Debug.LogErrorFormat("Unknown pile ID: {0}", pileID);
+        }
+
+        public void addCardToPile(int pileID, int cardID)
+        {
+            getPileCardStack(pileID).Push(cardID);
+        }
+
+        public void removeCardFromPileStack(int pileID, int cardID)
+        {
+            Stack<int> Pile = getPileCardStack(pileID);
+            int[] newArray = Pile.ToArray();
+            Stack<int> newStack = new Stack<int>();
+            for (int j = 0; j < newArray.Length; j++)
+            {
+                if (newArray[j] != cardID)
+                    newStack.Push(newArray[j]);
+            }
+            setPileCardStack(pileID, newStack);
         }
 
         public int? getStackPosition(int cardID, int pile_num)
@@ -315,18 +500,6 @@ namespace CardsVR.Interaction
             return CardsHandDominant.Count;
         }
 
-        public GameObject peekCard(int pile_num)
-        {
-            Stack<int> cardIDs = getPileCardStack(pile_num);
-            if (cardIDs.Count > 0)
-            {
-                int cardID = cardIDs.Peek();
-                return getCardByTag(cardID);
-            }
-            else
-                return null;
-        }
-
         public int peekCardID(int pile_num)
         {
             Stack<int> cardIDs = getPileCardStack(pile_num);
@@ -336,47 +509,14 @@ namespace CardsVR.Interaction
                 return -1;
         }
 
-        public GameObject grabCardPile2Hand(int pile_num)
+        public void transferCardHand2Pile(int pile_num)
         {
-            Stack<int> cardIDs = getPileCardStack(pile_num);
-
-            if (cardIDs.Count > 0)
-            {
-                // Move IDs
-                int CardID = cardIDs.Pop();
-                CardsHandDominant.Push(CardID);
-
-                // Move CardObject
-                GameObject Card = getCardByTag(CardID);
-                Card.transform.parent = HM.DominantHandCardAnchor;
-
-                return Card;
-            }
-            else
-            {
-                return null;
-            }
+            GameManager.Instance.getPileCardStack(pile_num).Push(GameManager.Instance.CardsHandDominant.Pop());
         }
-
-        public GameObject grabCardHand2Pile(int pile_num)
+        
+        public void transferCardPile2Hand(int pile_num)
         {
-            if (CardsHandDominant.Count > 0)
-            {
-                // Move ID & CardObject
-                int CardID = CardsHandDominant.Pop();
-                GameObject Card = getCardByTag(CardID);
-                GameObject CardAnchor = getPileCardAnchor(pile_num);
-                Stack<int> CardStack = getPileCardStack(pile_num);
-
-                CardStack.Push(CardID);
-                Card.transform.parent = CardAnchor.transform.Find("CardAnchor");
-
-                return Card;
-            }
-            else
-            {
-                return null;
-            }
+            GameManager.Instance.CardsHandDominant.Push(GameManager.Instance.getPileCardStack(pile_num).Pop());
         }
 
         public void setDebugText(string msg)

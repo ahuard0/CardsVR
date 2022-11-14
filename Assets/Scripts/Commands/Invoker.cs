@@ -16,7 +16,7 @@ namespace CardsVR.Commands
     {
         private Command _command;
         private float _replayTime = 0f;
-        private SortedList<float, Command> _recordedCommands = new SortedList<float, Command>();  // temporary variable used for playback of commands
+        private TupleList<float, Command> _recordedCommands = new TupleList<float, Command>();  // temporary variable used for playback of commands
 
         [HideInInspector]
         public bool isReplaying = false;

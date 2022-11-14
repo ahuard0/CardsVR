@@ -85,6 +85,16 @@ namespace CardsVR.Commands
                 CardToPile msg = CardToPile.FromObjectArray(data);
                 command = new MoveCardToPile(msg);
             }
+            else if (EventID == HandData.EventID)
+            {
+                HandData msg = HandData.FromObjectArray(data);
+                command = new ConfigHand(msg);
+            }
+            else if (EventID == AvatarData.EventID)
+            {
+                AvatarData msg = AvatarData.FromObjectArray(data);
+                command = new ConfigAvatar(msg);
+            }
             else if (EventID == Message.EventID)
             {
                 Message msg = Message.FromObjectArray(data);
@@ -94,6 +104,11 @@ namespace CardsVR.Commands
             {
                 Movement msg = Movement.FromObjectArray(data);
                 command = new ReceiveMovement(msg);
+            }
+            else if (EventID == TableHeightData.EventID)
+            {
+                TableHeightData msg = TableHeightData.FromObjectArray(data);
+                command = new SyncTableHeight(msg);
             }
             else
                 return;

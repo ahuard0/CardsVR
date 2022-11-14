@@ -1,6 +1,5 @@
 using CardsVR.Interaction;
 using CardsVR.States;
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -56,11 +55,6 @@ namespace CardsVR.Commands
             card.transform.parent = pileAnchor.transform;  // attach card to the pile anchor
             context.PileNum = pile_num;
             context.ChangeState(context.pileState);
-
-            // Update the Game Manager
-            int? i = GameManager.Instance.getStackPosition(cardID, pile_num);  // Get the position within the stack
-            if (i == null)
-                Debug.LogError("Card not found in the pile stack!");
 
             int? pile_src = GameManager.Instance.getPileNumByCard(cardID);
             if (pile_src == null)  // Card not in any pile stack

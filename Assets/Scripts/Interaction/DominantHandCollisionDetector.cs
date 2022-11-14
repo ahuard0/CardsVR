@@ -93,8 +93,12 @@ namespace CardsVR.Interaction
 
         public void NotifyObservers()
         {
-            foreach (IObserver observer in _observers)
-                observer.Notify();
+            try
+            {
+                foreach (IObserver observer in _observers)
+                    observer.Notify();
+            }
+            catch (System.InvalidOperationException) { }  // Occurs when cards are transferred and observers added or detached while the subject is inside the foreach loop.  This try/catch block acts as a break for the loop whe this event occurs.
         }
     }
 

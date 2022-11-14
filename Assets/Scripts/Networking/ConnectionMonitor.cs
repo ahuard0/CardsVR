@@ -48,7 +48,7 @@ namespace CardsVR.Networking
         private void UpdateStatus()
         {
             if (ConnectionStatusText != null)
-                ConnectionStatusText.text = "Connection Status: " + PhotonNetwork.NetworkClientState + " (Room Count: " + PhotonNetwork.CountOfRooms.ToString() + ", Players: " + PhotonNetwork.CountOfPlayers + ")";
+                ConnectionStatusText.text = "Connection Status: " + PhotonNetwork.NetworkClientState + " (Room Count: " + PhotonNetwork.CountOfRooms.ToString() + ", Players: " + PhotonNetwork.CountOfPlayers.ToString() + ")";
 
             if (RoomStatusPanel != null)
             {

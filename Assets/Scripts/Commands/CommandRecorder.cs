@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.Serialization.Formatters.Binary;
+using CardsVR.Utility;
 
 namespace CardsVR.Commands
 {
@@ -14,7 +15,7 @@ namespace CardsVR.Commands
      */
     public class CommandRecorder: Singleton<CommandRecorder>
     {
-        public SortedList<float, Command> RecordedCommands = new SortedList<float, Command>();
+        public TupleList<float, Command> RecordedCommands = new TupleList<float, Command>();
         private DateTime startTime = DateTime.MinValue;
 
         /*
@@ -39,13 +40,7 @@ namespace CardsVR.Commands
             TimeSpan span = DateTime.UtcNow - startTime;
             float timestamp = (float)span.TotalSeconds;
 
-            if (!RecordedCommands.ContainsKey(timestamp))  // Check for timestamp collision
-            {
-                RecordedCommands.Add(timestamp, command);  // No prior timestamp
-            } else
-            {
-                RecordedCommands.Add(RecordedCommands.Keys[RecordedCommands.Keys.Count - 1] + 0.00001f, command);  // Sometimes two commands are sent on the same frame.  The collision is avoided here by adding a small Epsilon to the timestamp (0.00001f), which was selected by trial and error.
-            }
+            RecordedCommands.Add(timestamp, command);
         }
 
         /*
@@ -86,7 +81,7 @@ namespace CardsVR.Commands
             using (FileStream fs = new FileStream(loadpath, FileMode.Open, FileAccess.Read))
             {
                 BinaryFormatter bf = new BinaryFormatter();
-                RecordedCommands = (SortedList<float, Command>)bf.Deserialize(fs);
+                RecordedCommands = (TupleList<float, Command>)bf.Deserialize(fs);
             }
         }
 

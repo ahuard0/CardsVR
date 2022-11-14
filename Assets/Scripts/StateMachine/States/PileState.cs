@@ -1,4 +1,6 @@
+using CardsVR.Commands;
 using CardsVR.Interaction;
+using CardsVR.Networking;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -29,6 +31,26 @@ namespace CardsVR.States
             DominantHandCollisionDetector.Instance.DetachObserver(this);
         }
 
+        private bool Validate()
+        {
+            // SET CONTEXT PARAMETERS
+            // Update Context PileID
+            int? pileID = GameManager.Instance.getPileNumByCard(Context.CardID);
+            if (pileID == null)
+                return false;
+            else
+                Context.PileNum = (int)pileID;
+
+            // Update State if PileNum doesn't match
+            if (Context.PileNum == -1)  // Race condition detected, change state to finger state
+            {
+                Context.ChangeState(Context.fingerState);
+                return false;
+            }
+
+            return true;
+        }
+
         /*
          *      Synchronizes the card's Game Object with the GameManager and context model.
          *      
@@ -46,38 +68,27 @@ namespace CardsVR.States
         {
             base.UpdateLogic();
 
-            // SET CONTEXT PARAMETERS
-            // Update Context PileID
-            int? pileID = GameManager.Instance.getPileNumByCard(Context.CardID);
-            if (pileID == null)
+            if (!Validate())
                 return;
-            else
-                Context.PileNum = (int)pileID;
-
-            // Update Context FaceUp Flag
-            if (Context.PileNum == 0)  // Card is in the Deck Pile
-                Context.FaceUp = false;
-            else  // Card is in a Table Pile
-                Context.FaceUp = true;
 
             // SET STATE PARAMETERS
             // Update State initialized Flag
             initialized = true;  // at least one logic update cycle must be performed before processing Notify() events
 
             // Update State TopCard Flag
-            topCard = Context.CardID == GameManager.Instance.peekCardID(Context.PileNum);  // only process cards that are on the top of each pile stack
+            topCard = Context.CardID == GameManager.Instance.peekCardID(Context.PileNum);  // only pick up cards that are on the top of each pile stack.  Used in Notify().
 
+            // Update Context FaceUp Flag
+            if (Context.PileNum == 0 || Context.PileNum == 7)  // Card is in a Deck Pile (0 or 7)
+                Context.FaceUp = false;
+            else  // Card is in a Table Pile
+                Context.FaceUp = true;
 
             // CONFIGURE GAME OBJECT
             // Get the Card GO
             GameObject card = GameManager.Instance.getCardByTag(Context.CardID);
             if (card == null)
                 Debug.LogErrorFormat("Card not found.  ID={0}.", Context.CardID);
-
-            // Get the Number of Cards in the Stack
-            int Pile_Count = GameManager.Instance.getNumCards(Context.PileNum);
-            if (Pile_Count == 0)
-                Debug.LogErrorFormat("No cards in pile {0}.", Context.PileNum);
 
             // Set the Card GO Parent
             GameObject cardAnchor = GameManager.Instance.getPileCardAnchor(Context.PileNum);
@@ -90,16 +101,27 @@ namespace CardsVR.States
             if (i == null)
                 Debug.LogError("Card not found in the pile stack!");
 
-            if (Context.PileNum == 0)  // Card is in the Deck Pile
+            // Get the Number of Cards in the Stack
+            int Pile_Count = GameManager.Instance.getNumCards(Context.PileNum);
+            if (Pile_Count == 0)
+                Debug.LogErrorFormat("No cards in pile {0}.", Context.PileNum);
+
+            // Adjust Card Position
+            if (Context.PileNum == 0 || Context.PileNum == 7)  // Card is in a Deck Pile
+                card.transform.localPosition = new Vector3(0, (Pile_Count - (int)i - 1) * (GameManager.Instance.cardThickness), 0); // Stack by Card Height
+            else if (Context.PileNum == 1 || Context.PileNum == 6)  // Card is in a Discard Pile
                 card.transform.localPosition = new Vector3(0, (Pile_Count - (int)i - 1) * (GameManager.Instance.cardThickness), 0); // Stack by Card Height
             else if (Context.PileNum > 0) // Card is in a Table Pile
+            {
                 card.transform.localPosition = new Vector3(0, (Pile_Count - (int)i - 1) * (GameManager.Instance.cardThickness), (Pile_Count - (int)i - 1) * GameManager.Instance.pileOffset); // Stack by Card Height
+
+                GameObject CardCollider = GameManager.Instance.getPileCardCollider(Context.PileNum);
+                CardCollider.transform.localPosition = new Vector3(0, (Pile_Count - 1) * (GameManager.Instance.cardThickness), (Pile_Count - 1) * GameManager.Instance.pileOffset); // Adjust collider
+            }
             else if (Context.PileNum == -1)  // Card is held in the dominant hand
                 Debug.LogError("Pile State set while card is held in the dominant hand!");
-            else if (Context.PileNum < -1)  // Card is held in the inferior hand
+            else if (Context.PileNum == -2)  // Card is held in the inferior hand
                 Debug.LogError("Pile State set while card is held in the inferior hand!");
-            else
-                Debug.LogErrorFormat("Unknown Pile Number: {0}", Context.PileNum);
 
             // Set Card GO Rotation
             if (Context.FaceUp)
@@ -129,7 +151,10 @@ namespace CardsVR.States
 
             if (Context.PileNum != DominantHandCollisionDetector.Instance.pileHit)  // filter out actions on other piles
                 return;
-            
+
+            if (Context.PileNum == -3)  // Cannot pickup free cards. Do not claim ownership of free cards (initialization band-aid)
+                return;
+
             int pile_num = DominantHandCollisionDetector.Instance.pileHit;
 
             GameManager.Instance.setDebugText("Pile Number: " + DominantHandCollisionDetector.Instance.pileHit.ToString());  // output debug text
@@ -158,9 +183,23 @@ namespace CardsVR.States
                         Context.Position = card.transform.position;
                         Context.Rotation = card.transform.rotation;
 
-                        // Update the Game Manager:  TODO make this a function in GM with network sync
-                        GameManager.Instance.StateDominantHand = GameManager.DominantHandState.Held;
-                        GameManager.Instance.CardsHandDominant.Push(GameManager.Instance.getPileCardStack(pile_num).Pop());
+                        // Update the Game Manager
+                        GameManager.Instance.transferCardPile2Hand(pile_num);
+
+                        // Play Audio
+                        AudioManager.Instance.PlayCardSwipe();
+
+                        // Change Owner to Current User
+                        CardControlData data = new CardControlData(Context.CardID, PlayerManager.Instance.PlayerNum);
+                        SendData command = new SendData(data: data, SendReliable: true, ReceiveLocally: true);
+                        Invoker.Instance.SetCommand(command);
+                        Invoker.Instance.ExecuteCommand(false);  // do not record command history
+
+                        // Send to Remote clients
+                        CardToPile data2 = new CardToPile(cardID: Context.CardID, pile: -3, name: Context.name);  // updates remote clients to transition from Pile State -> Move State
+                        SendData command2 = new SendData(data: data2, SendReliable: true, ReceiveLocally: false);
+                        Invoker.Instance.SetCommand(command2);
+                        Invoker.Instance.ExecuteCommand(false);  // do not record command history
 
                         // Update State
                         Context.ChangeState(Context.fingerState);  // Pick up the card (Change State to FingerState)

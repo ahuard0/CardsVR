@@ -99,6 +99,14 @@ namespace CardsVR.Utility
             return (float)sum;
         }
 
+        public static bool Exists<T>(T[] array, T value)
+        {
+            foreach (T item in array)
+                if (item.Equals(value))
+                    return true;
+            return false;
+        }
+
     }
 }
 

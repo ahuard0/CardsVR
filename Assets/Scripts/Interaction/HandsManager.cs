@@ -24,6 +24,40 @@ namespace CardsVR.Interaction
         public Transform InferiorFingerCardAnchor;
         public Transform InferiorHandCardAnchor;
 
+        public IList<OVRBone> BonesRight
+        {
+            get
+            {
+                if (Dominant == HandsManager.Side.Right)
+                {
+                    return DominantBones;
+                }
+                else if (Dominant == HandsManager.Side.Left)
+                {
+                    return InferiorBones;
+                }
+                else
+                    return null;
+            }
+        }
+
+        public IList<OVRBone> BonesLeft
+        {
+            get
+            {
+                if (Dominant == HandsManager.Side.Right)
+                {
+                    return InferiorBones;
+                }
+                else if (Dominant == HandsManager.Side.Left)
+                {
+                    return DominantBones;
+                }
+                else
+                    return null;
+            }
+        }
+
         private void Start()
         {
             Dominant = Side.Unknown;
@@ -40,6 +74,26 @@ namespace CardsVR.Interaction
             detectAnchors();
         }
 
+        public bool IsTrackHighConfidence(Side side)
+        {
+            if (side == Side.Left)
+            {
+                if (HandLeft != null)
+                    return HandLeft.IsDataHighConfidence;
+                else
+                    return false;
+            }
+            else if (side == Side.Right)
+            {
+                if (HandRight != null)
+                    return HandRight.IsDataHighConfidence;
+                else
+                    return false;
+            }
+            else
+                return false;
+        }
+
         private void detectHands()
         {
             if (HandRight is null)
@@ -48,7 +102,7 @@ namespace CardsVR.Interaction
                 foreach (object obj in foundOVRHandObjects)
                 {
                     OVRHand hand = (OVRHand)obj;
-                    if (hand.name.Contains("Right"))
+                    if (hand.name.Contains("Right") || hand.name.Contains("_R"))
                     {
                         HandRight = hand;
                     }
@@ -61,7 +115,7 @@ namespace CardsVR.Interaction
                 foreach (object obj in foundOVRHandObjects)
                 {
                     OVRHand hand = (OVRHand)obj;
-                    if (hand.name.Contains("Left"))
+                    if (hand.name.Contains("Left") || hand.name.Contains("_L"))
                     {
                         HandLeft = hand;
                     }
@@ -101,7 +155,7 @@ namespace CardsVR.Interaction
                     foreach (object obj in foundOVRSkeletonObjects)
                     {
                         OVRSkeleton skeleton = (OVRSkeleton)obj;
-                        if (skeleton.name.Contains("Right"))
+                        if (skeleton.name.Contains("Right") || skeleton.name.Contains("_R"))
                         {
                             if (Dominant == Side.Right)
                             {
@@ -114,7 +168,7 @@ namespace CardsVR.Interaction
                             else
                                 throw new System.Exception("Dominant Side not set.");
                         } 
-                        else if (skeleton.name.Contains("Left"))
+                        else if (skeleton.name.Contains("Left") || skeleton.name.Contains("_L"))
                         {
                             if (Dominant == Side.Left)
                             {

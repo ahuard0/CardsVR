@@ -1,5 +1,4 @@
 using CardsVR.Interaction;
-using System.Collections.Generic;
 
 namespace CardsVR.Commands
 {

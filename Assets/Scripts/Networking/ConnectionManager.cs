@@ -27,6 +27,8 @@ namespace CardsVR.Networking
     {
 
         public enum ConnectState { disconnected, connected };
+
+        [HideInInspector]
         public ConnectState master = ConnectState.disconnected;
         private ArrayList _observers = new ArrayList();
         private bool AutoConnect = false;
@@ -100,7 +102,7 @@ namespace CardsVR.Networking
         public void Connect(bool auto)
         {
             AutoConnect = auto;
-            PhotonNetwork.LocalPlayer.NickName = "Player" + UnityEngine.Random.Range(1000, 9999);
+            PhotonNetwork.LocalPlayer.NickName = "Player" + Random.Range(1000, 9999);
             PhotonNetwork.ConnectUsingSettings();
             PhotonNetwork.ConnectToRegion("us");
         }
@@ -132,15 +134,21 @@ namespace CardsVR.Networking
          *      
          *      Returns
          *      -------
-         *      None
+         *      success : bool
+         *          A flag indicating whether a room was created.
          */
-        public void CreateRoom()
+        public bool CreateRoom()
         {
-            string roomName = "Room " + UnityEngine.Random.Range(1000, 10000);
-            byte maxPlayers = 2;
+            string roomName = "Room " + Random.Range(1000, 10000);
+            return CreateRoom(roomName);
+        }
+
+        public bool CreateRoom(string roomName)
+        {
+            byte maxPlayers = 5;
             RoomOptions options = new RoomOptions { MaxPlayers = maxPlayers, PlayerTtl = 10000 };
 
-            PhotonNetwork.CreateRoom(roomName, options, null);
+            return PhotonNetwork.CreateRoom(roomName, options, null);
         }
 
         /*
@@ -245,6 +253,31 @@ namespace CardsVR.Networking
         #region PUN
 
         /*
+         *      PUN callback when disconnected from the server.
+         *      
+         *      It could be a failure or an intentional disconnect.
+         *      
+         *      Parameters
+         *      ----------
+         *      cause : DisconnectCause
+         *          Includes ClientTimeout and ServerTimeout, which are used to indicate an internet connection failure.
+         *      
+         *      Returns
+         *      -------
+         *      None
+         */
+        public override void OnDisconnected(DisconnectCause cause)
+        {
+            base.OnDisconnected(cause);
+            if (cause == DisconnectCause.None)
+                return;
+            if (cause == DisconnectCause.DisconnectByClientLogic)
+                return;
+            if (cause == DisconnectCause.ClientTimeout || cause == DisconnectCause.ServerTimeout)
+                return;
+        }
+
+        /*
          *      PUN callback when connected to master server.
          *      
          *      Parameters
@@ -311,9 +344,9 @@ namespace CardsVR.Networking
             if (AutoConnect)  // Autoconnect Flag is set by Connect(auto)
             {
                 if (cachedRoomList.Count > 0)
-                    JoinRoom(0);
+                    JoinRoom(0);  // room index [0] : first room
                 else
-                    CreateRoom();
+                    CreateRoom();  // create a room if none available
 
                 AutoConnect = false;  // Reset Flag
             }
@@ -400,8 +433,6 @@ namespace CardsVR.Networking
         /*
          *      Callback when joining a room.  Notify the connection observer to update the GUI or take action such as loading the game scene.
          *      
-         *      Sets the Player Nickname. (e.g., Player 1, Player 2, etc.)
-         *      
          *      Parameters
          *      ----------
          *      None
@@ -412,31 +443,6 @@ namespace CardsVR.Networking
          */
         public override void OnJoinedRoom()
         {
-            bool player1 = false;
-            bool player2 = false;
-            foreach (Player player in PhotonNetwork.CurrentRoom.Players.Values)
-            {
-                if (player.NickName.Contains("Player 1"))
-                    player1 = true;
-                if (player.NickName.Contains("Player 2"))
-                    player2 = true;
-            }
-            if (!player1)
-            {
-                PhotonNetwork.NickName = "Player 1";
-                PlayerManager.Instance.PlayerNum = 1;
-            }
-            else if (!player2)
-            {
-                PhotonNetwork.NickName = "Player 2";
-                PlayerManager.Instance.PlayerNum = 2;
-            }
-            else
-            {
-                Debug.LogError("Player 1 and 2 already connected!");
-            }
-            Debug.Log("Joined Room as " + PhotonNetwork.NickName);
-
             NotifyObservers();
         }
 

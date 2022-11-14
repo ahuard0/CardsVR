@@ -19,6 +19,9 @@ namespace CardsVR.Commands
      */
     public class PileSyncClient : MonoBehaviour, IOnEventCallback
     {
+        [SerializeField]
+        private float pileSyncInterval = 0.2f;
+
         /*
          *      Unity MonoBehavior callback OnEnable is called whenever the attached 
          *      GameObject is enabled.  On scene load, this occurs after Awake and 
@@ -59,6 +62,21 @@ namespace CardsVR.Commands
             PhotonNetwork.RemoveCallbackTarget(this);
         }
 
+        /*
+         *      Unity MonoBehavior callback used to perform actions on startup.
+         *      
+         *      This method starts the coroutine that synchronizes the card piles
+         *      periodically, one pile every fixed time period.
+         *      
+         *      Parameters
+         *      ----------
+         *      None
+         *      
+         *      Returns
+         *      -------
+         *      None
+         */
+
         private void Start()
         {
             StartCoroutine("SyncPiles");
@@ -84,9 +102,9 @@ namespace CardsVR.Commands
             {
                 SyncPileData(i);
                 i++;
-                if (i > 6)
-                    i = 0;
-                yield return new WaitForSecondsRealtime(0.2f);
+                if (i > 7)
+                    i = -1;
+                yield return new WaitForSecondsRealtime(pileSyncInterval);
             }
         }
 
@@ -108,7 +126,7 @@ namespace CardsVR.Commands
             {
                 Stack<int> cardIDs = GameManager.Instance.getPileCardStack(pileID);
                 PileData data = new PileData(pileID, cardIDs);
-                SendData command = new SendData(data, false, true);
+                SendData command = new SendData(data: data, SendReliable: false, ReceiveLocally: true);
                 Invoker.Instance.SetCommand(command);
                 Invoker.Instance.ExecuteCommand(true);  // record command history
             }

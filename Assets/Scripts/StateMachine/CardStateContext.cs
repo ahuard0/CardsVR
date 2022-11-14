@@ -133,13 +133,6 @@ namespace CardsVR.States
                     if (this.currentState == this.pileState)
                         ChangeState(this.moveState);
                 }
-
-                //// Create Command
-                //Movement.ReceiveMovement command = new Movement.ReceiveMovement(msg);
-
-                //// Invoke Command
-                //invoker.SetCommand(command);
-                //invoker.ExecuteCommand(true);  // record command history
             } else if (EventCode == Message.EventID)
             {
                 // Create Message Object

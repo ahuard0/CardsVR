@@ -1,6 +1,3 @@
-using CardsVR.Interaction;
-using UnityEngine;
-
 namespace CardsVR.States
 {
     public class MoveState : BaseState
@@ -25,8 +22,6 @@ namespace CardsVR.States
         public override void UpdateLogic()
         {
             base.UpdateLogic();
-
-            // Receive events from the network to change state from Move->Pile as needed.
         }
 
         public override void UpdatePhysics()

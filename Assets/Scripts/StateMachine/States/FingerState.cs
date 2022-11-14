@@ -1,6 +1,7 @@
 using CardsVR.Interaction;
 using UnityEngine;
 using CardsVR.Commands;
+using CardsVR.Networking;
 
 namespace CardsVR.States
 {
@@ -29,14 +30,26 @@ namespace CardsVR.States
         {
             base.Exit();
             DominantHandCollisionDetector.Instance.DetachObserver(this);
+        }
 
-            Message msg = new Message(Context.gameObject.name);
+        private bool Validate()
+        {
+            // Update Context PileID
+            int? pileID = GameManager.Instance.getPileNumByCard(Context.CardID);
+            if (pileID == null)
+                return false;
+            else
+                Context.PileNum = (int)pileID;
 
-            if (msg != null)
+            // Check Card State
+            int Pile_Count = GameManager.Instance.getNumCards(Context.PileNum);
+            if (Pile_Count == 0 || Context.PileNum >= 0)  // A rare event -> Change to the Pile State.  Rely on the PileSyncClient to update the remote piles.
             {
-                Invoker.Instance.SetCommand(new SendMessage(msg));
-                Invoker.Instance.ExecuteCommand(false);  // do not record sends in command history
+                Context.ChangeState(Context.pileState);  // Place the card (set state to PileState)
+                return false;
             }
+
+            return true;
         }
 
         public override void UpdateLogic()
@@ -44,13 +57,12 @@ namespace CardsVR.States
             base.UpdateLogic();
             initialized = true;  // at least one logic update cycle must be performed before processing Notify() events
 
-            // Get the Card GO and Number of Cards in the Stack
-            GameObject card = GameManager.Instance.getCardByTag(Context.CardID);
-            if (card == null)
+            if (!Validate())
                 return;
 
-            int Pile_Count = GameManager.Instance.getNumCards(Context.PileNum);
-            if (Pile_Count == 0)
+            // Get the Card GO
+            GameObject card = GameManager.Instance.getCardByTag(Context.CardID);
+            if (card == null)
                 return;
 
             // Set the Card Pile Anchor (GameObject Parent)
@@ -140,14 +152,21 @@ namespace CardsVR.States
                         Context.Position = card.transform.position;
                         Context.Rotation = card.transform.rotation;
 
+                        // Update the Game Manager
+                        GameManager.Instance.transferCardHand2Pile(pile_num);
+
+                        // Play Audio
+                        AudioManager.Instance.PlayCardSwipe();
+
                         // Send to Remote clients
-                        CardToPile data = new CardToPile(Context.CardID, Context.PileNum, Context.name);
-                        SendData command = new SendData(data, true, true);
+                        CardToPile data = new CardToPile(cardID: Context.CardID, pile: Context.PileNum, name: Context.name);  // updates remote clients to transition from Move State -> Pile State
+                        SendData command = new SendData(data: data, SendReliable: true, ReceiveLocally: true);
                         Invoker.Instance.SetCommand(command);
                         Invoker.Instance.ExecuteCommand(true);  // record command history
 
                         // Update State
                         Context.ChangeState(Context.pileState);  // Place the card (set state to PileState)
+
                     }
                 }
             }
